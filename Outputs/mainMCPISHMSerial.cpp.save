@@ -1,0 +1,155 @@
+#include "SHM.h"
+#include "MCPIIOM.h"
+#include "Basic.h"
+// intial conditions 
+double init[6] = { -464.856e3, 6667.880e3, 574.231e3, -2.8381186e3, -0.7871898e3, 7.0830275e3 };
+//double init[6] ={2.865408457000000e6,   5.191131097000000e6,   2.848416876000000e6,-5.386247766000000e3,  -0.386715190500000e3,   6.123151881000000e3};
+//double init[6] ={6428.065890e3,   -27.731555e3,   -12.048396e3,0.034458e3,  5.568015e3,   5.568189e3};
+const double tSpan =  6.218728118000000e+03; //5400/10;			// time span of segment integration
+const int numSeg = 5 ; //15;				// number of segments to integrate
+int  N=100;
+
+int M=N+1; 
+
+
+const int Nstates= 6;
+const int MaxIter= 100; // Maximum Iteration - when the loop does not converege
+double mcpi_tol= 1.0e-17; //1.0e-10;
+std::string outputPath = "./resultSHMSerial2.txt";
+
+
+
+// main function
+int main() {
+
+	cout << "************************************************************************" << endl;
+    cout << "*        Copyright (c) Ahmed Atallah &Ahmad Bani Younes 2019           *" << endl;
+    cout << "*         San Diego State University - AEROSPACE department            *" << endl;
+    cout << "************************************************************************" << endl;
+    cout << "    Subject       : MCPI - trajectory propagator for EGM2008            " << endl;
+    cout << "    Description   : Integrate perturbed satellite motion with EGM 2008  " << endl;
+	cout << "                    Gravity Acceleration in spherical Harmonic.         " << endl;
+	cout << "    Date Modified : 08/13/2019                                          " << endl;
+	cout << "************************************************************************" << endl << endl << endl;
+
+
+
+	// allocating host memory for constant arrays
+	int i;
+	double x0[Nstates  ] = {0.0};  // starting Cond. Vector
+	double Xo[M*Nstates] = {0.0};  // starting guess Matrix
+	for ( int kk=0; kk<Nstates; kk++ )
+		x0[kk] = init[kk];
+		
+	for (int m=0; m<M;m++)
+		for ( int kk=0; kk<Nstates; kk++ )
+			Xo[IDX2F(m+1,kk+1,M)] = init[kk];
+	
+	// BUILD TAU VECTOR {MCPI printf( "- time domain}
+	double TAU[M] = {0.0};
+	for ( i=0; i<M; i++ ) 
+		TAU[i] = cos((double)i*Pi/(double)(M-1) +Pi);
+	// allocating new memory space for loop arrays
+
+	double xAdd[M*Nstates]={0.0};
+	double G[M*Nstates]={0.0};
+	double Xn[M*Nstates]={0.0};
+	
+	// timer for loop operations
+	double timeSubArr[numSeg] = {0.0};
+	double timeAddArr[numSeg] = {0.0};
+	double timearray[numSeg]={0.0};
+	double Tsum = {0.0};
+
+
+
+	// Loading the MCPI coeff's
+	// allocating MCPI-loop memory
+	printf( "Allocating MCPI-loop memory for matrix calculations...\n\n" );
+	double Im[M*M];
+    MCPI_CoeffsI(N,M,Im);
+	double ImT[M*M];
+	trans( Im,ImT,M, M,M);
+
+
+		
+	// OPEN output file to write the results
+	FILE *fToOpen;
+	if((fToOpen=fopen( outputPath.c_str( ),"w"))==NULL)
+	{
+		printf("Cannot open file to write result!");
+		return EXIT_FAILURE;
+	}
+	printf( "MCPI- trajectory propagation....\n" );
+	printf( "Convergence Report \n" );
+	printf( "==========================================================================\n\n" );
+	double timeArray[M*numSeg] = {0};
+	double timeArraySeg[M]={0};
+	for(int IT=0; IT<numSeg; IT++){	
+		clock_t mcpistart = clock();       //     get initial time in sec's 
+		// set up time variables for current segment
+		double b = ( (double)IT + 1.0 )*tSpan/numSeg;
+		double a = (double)IT *tSpan/numSeg;
+		double timeSub = (b-a)/2.0;
+	    double timeAdd = (b+a)/2.0;
+		timeSubArr[IT] = timeSub;
+		timeAddArr[IT] = timeAdd;
+
+		// iterate until convergence on this segment
+	    int loopCount = 0;
+	    double temp  = 1.000000000000000;    // this is to find the maximum Error
+	   
+		for ( int k=0; k<M; k++) {
+			timeArraySeg[k] = timeSubArr[IT] * TAU[k] + timeAddArr[IT];
+		}
+		
+		
+//	    while (temp>mcpi_tol)
+		while (loopCount<MaxIter)
+		{ //  printf(" Xo \n");
+		//	printArray(Xo,M,Nstates,M);	
+			accGravity(M, 200,timeArraySeg,Xo,G);
+//			accGravityFEM(M,Xo,G);
+		//	printf(  " G  \n");
+		//	printArray(G,M,6,M);
+			matmul(ImT,G,xAdd,M,M,Nstates);
+			
+			errorAndUpdate(M,timeSub,Nstates,x0,Xo,Xn,xAdd,temp);
+		
+			if(loopCount >= MaxIter)
+				break;
+			loopCount++;
+		} 
+
+		// Update the Initial Conditions
+		for ( int kk=0; kk<Nstates; kk++ )
+			x0[kk] = Xn[IDX2F(M,kk+1,M)];
+		for (int m=0; m<M;m++)
+		for ( int kk=0; kk<Nstates; kk++ )
+			Xo[IDX2F(m+1,kk+1,M)] = x0[kk];
+		timearray[IT] = ((double)clock() - mcpistart)*1000.0 / CLOCKS_PER_SEC;
+		printf( " Orbit # %i takes (ms): %lf, converged in %i iterations\n", IT+1, timearray[IT], loopCount );
+		Tsum += timearray[IT];	
+
+	
+//		printf( " Time Array \n");
+//		printArray(timeArraySeg,M,1,M);
+		//report convergence
+		for ( int k=0; k<M; k++ ) {
+			for ( int kk=0; kk<Nstates; kk++ )
+				fprintf( fToOpen, "%6.16lf\t", Xn[IDX2F(k+1,kk+1,M)] );
+
+			fprintf( fToOpen, "%6.16lf\t", timeArraySeg[k] );
+			fprintf( fToOpen, "\n");
+		}
+	} // end for IT loop
+	
+	//fclose(fToOpen);	
+
+	cout<<"\n\nDONE..."<<"\n\n";
+		printf( "==========================================================================\n\n" );
+	printf( "Total computation time for integrating the whole trajectory (ms): %lf\n\n", Tsum );	
+
+    
+    return 0;
+}
