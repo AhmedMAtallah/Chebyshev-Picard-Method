@@ -26,10 +26,10 @@ Code Deveopers : Ahmed Atallah and Ahmad Bani Younes
 */
 
 
-#include "MCPIIOM.h"
-#include "const.h"
+#include "../include/MCPIIOM.h"
+#include "../include/const.h"
 //#include "FEM.h"
-#include "Basic.h"
+#include "../include/Basic.h"
 
 //#define N  40			// number of nodes 
 //#define M  (N+1)				// number of nodes + 1

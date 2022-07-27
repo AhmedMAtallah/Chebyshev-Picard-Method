@@ -24,9 +24,9 @@ Code Deveopers : Ahmed Atallah and Ahmad Bani Younes
      
 */
 
-#include "SHM.h"
-#include "MCPIIOM.h"
-#include "Basic.h"
+#include "../include/SHM.h"
+#include "../include/MCPIIOM.h"
+#include "../include/Basic.h"
 
 
 
@@ -139,7 +139,7 @@ int main() {
 
 		clock_t mcpistart = clock();       //     get initial time in sec's
 		
-		double time12=calcTimeStep(x0, a,e,f);
+		//double time12=calcTimeStep(x0, a,e,f);
 
 //		double elem[10];
 //		rv2elem(y,1E-10,elem);

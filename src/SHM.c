@@ -32,9 +32,9 @@ Code Deveopers : Ahmed Atallah and Ahmad Bani Younes
      
 */
 
-#include "SHM.h"
+#include "../include/SHM.h"
 #include "EGM2008.cc"
-#include "Basic.h"
+#include "../include/Basic.h"
 #include <omp.h>
 //#include "const.h"
 

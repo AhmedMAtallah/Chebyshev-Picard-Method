@@ -26,8 +26,8 @@ Code Deveopers : Ahmed Atallah and Ahmad Bani Younes
 
 
 
-#include "Basic.h"
-#include "const.h"
+#include "../include/Basic.h"
+#include "../include/const.h"
 
 
 int iDivUp(int a, int b)
